@@ -232,9 +232,14 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		// устойчивее через форвардеры с буферизацией (NDMS/Keenetic).
 		buf := make([]byte, 16*1024)
 		for {
-			tcpConn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			// Без read-дедлайна: тихий RDP-сервер (статичный экран) — норма,
+			// kill после 60с тишины рвал живые сессии (i/o timeout в логе).
+			// Мёртвых детектим иначе: браузер — WS-пингом каждые 25с,
+			// молчавший TCP-пир — OS keepalive (dialer KeepAlive 30с).
 			n, err := tcpConn.Read(buf)
 			if n > 0 {
+				// Запись в WS — с дедлайном (тут у нас есть контроль: браузер
+				// должен отвечать, иначе сессия мёртва). Read — без.
 				wsConn.SetWriteDeadline(time.Now().Add(60 * time.Second))
 				if werr := wsConn.WriteMessage(websocket.BinaryMessage, buf[:n]); werr != nil {
 					if ce, ok := werr.(*websocket.CloseError); ok {
