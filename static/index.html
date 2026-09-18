@@ -5,43 +5,358 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>grdpwasm — Web RDP Client</title>
   <style>
+    /* Fallback-переменные темы панели Entware Manager (светлая) — применяются,
+       когда клиент открыт отдельно (новая вкладка). В iframe тема синхронизируется
+       из родительского документа скриптом ниже. */
+    :root {
+      --bg-gradient: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+      --app-bg: #f8fafc;
+      --app-border: #e2e8f0;
+      --sidebar-bg: #ffffff;
+      --sidebar-border: #e2e8f0;
+      --content-bg: #f8fafc;
+      --text-primary: #1a202c;
+      --text-secondary: #4a5568;
+      --text-muted: #718096;
+      --accent: #8b5cf6;
+      --accent-dark: #6d28d9;
+      --accent-rgb: 139, 92, 246;
+      --accent-gradient: linear-gradient(135deg, #8b5cf6, #6d28d9);
+      --accent-soft: rgba(var(--accent-rgb), 0.1);
+      --accent-glow: rgba(var(--accent-rgb), 0.25);
+      --table-header-bg: linear-gradient(135deg, #6d28d9, #5b21b6);
+      --btn-gradient: linear-gradient(135deg, #7c3aed, #6d28d9);
+      --border-color: #e2e8f0;
+      --table-bg: #ffffff;
+      --table-row-even: #f8fafc;
+      --table-row-hover: #f1f5f9;
+      --input-bg: #ffffff;
+      --input-border: #e2e8f0;
+      --input-focus: #8b5cf6;
+      --modal-bg: #ffffff;
+      --pre-bg: #f4f4f4;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+      --progress-bg: #edf2f7;
+      --command-block-bg: #f1f5f9;
+      --note-border: #f59e0b;
+      --btn-bg: var(--btn-gradient);
+      --btn-text: #ffffff;
+      --btn-shadow: 0 4px 6px -1px rgba(var(--accent-rgb), 0.25);
+      --btn-hover-shadow: 0 10px 15px -3px rgba(var(--accent-rgb), 0.35);
+      --btn-disabled-opacity: 0.6;
+      --btn-success: #27ae60;
+      --btn-danger: #e74c3c;
+      --btn-muted: #4a5568;
+      --scrollbar-thumb: #cbd5e0;
+      --scrollbar-track: #f1f5f9;
+    }
+    html.night {
+      --bg-gradient: linear-gradient(135deg, #1a202c, #2d3748);
+      --app-bg: rgba(26, 32, 44, 0.95);
+      --app-border: rgba(74, 85, 104, 0.6);
+      --sidebar-bg: rgba(26, 32, 44, 0.9);
+      --sidebar-border: rgba(74, 85, 104, 0.6);
+      --content-bg: rgba(26, 32, 44, 0.8);
+      --text-primary: #e2e8f0;
+      --text-secondary: #cbd5e0;
+      --text-muted: #a0aec0;
+      --accent: #8b5cf6;
+      --accent-dark: #6d28d9;
+      --accent-rgb: 139, 92, 246;
+      --accent-gradient: linear-gradient(135deg, #c4b5fd, #8b5cf6);
+      --accent-soft: rgba(var(--accent-rgb), 0.2);
+      --accent-glow: rgba(var(--accent-rgb), 0.4);
+      --table-header-bg: linear-gradient(135deg, #5b21b6, #4c1d95);
+      --btn-gradient: linear-gradient(135deg, #6d28d9, #5b21b6);
+      --border-color: #4a5568;
+      --table-bg: #2d3748;
+      --table-row-even: #374151;
+      --table-row-hover: #4a5568;
+      --input-bg: #4a5568;
+      --input-border: #2d3748;
+      --input-focus: #8b5cf6;
+      --modal-bg: #2d3748;
+      --pre-bg: #1a202c;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      --progress-bg: #4a5568;
+      --command-block-bg: #2d3748;
+      --note-border: #f59e0b;
+      --btn-bg: var(--btn-gradient);
+      --btn-text: #ffffff;
+      --btn-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      --btn-hover-shadow: 0 10px 15px -3px rgba(var(--accent-rgb), 0.5);
+      --btn-disabled-opacity: 0.5;
+      --btn-success: #27ae60;
+      --btn-danger: #e74c3c;
+      --btn-muted: #718096;
+      --scrollbar-thumb: #4a5568;
+      --scrollbar-track: #2d3748;
+    }
+    /* Пресеты темы — повторяют style.css панели (акценты + градиенты кнопок) */
+    [data-theme="ocean"] {
+      --accent: #0ea5e9; --accent-dark: #0369a1; --accent-rgb: 14, 165, 233;
+      --accent-gradient: linear-gradient(135deg, #38bdf8, #0284c7);
+      --table-header-bg: linear-gradient(135deg, #0284c7, #0369a1);
+      --btn-gradient: linear-gradient(135deg, #0284c7, #0369a1);
+      --input-focus: #0ea5e9;
+    }
+    [data-theme="forest"] {
+      --accent: #10b981; --accent-dark: #047857; --accent-rgb: 16, 185, 129;
+      --accent-gradient: linear-gradient(135deg, #34d399, #059669);
+      --table-header-bg: linear-gradient(135deg, #059669, #047857);
+      --btn-gradient: linear-gradient(135deg, #059669, #047857);
+      --input-focus: #10b981;
+    }
+    [data-theme="teal"] {
+      --accent: #14b8a6; --accent-dark: #0f766e; --accent-rgb: 20, 184, 166;
+      --accent-gradient: linear-gradient(135deg, #2dd4bf, #0d9488);
+      --table-header-bg: linear-gradient(135deg, #0d9488, #0f766e);
+      --btn-gradient: linear-gradient(135deg, #0d9488, #0f766e);
+      --input-focus: #14b8a6;
+    }
+    [data-theme="amber"] {
+      --accent: #f59e0b; --accent-dark: #b45309; --accent-rgb: 245, 158, 11;
+      --accent-gradient: linear-gradient(135deg, #fbbf24, #d97706);
+      --table-header-bg: linear-gradient(135deg, #d97706, #b45309);
+      --btn-gradient: linear-gradient(135deg, #d97706, #b45309);
+      --input-focus: #f59e0b;
+    }
+    [data-theme="ruby"] {
+      --accent: #ef4444; --accent-dark: #b91c1c; --accent-rgb: 239, 68, 68;
+      --accent-gradient: linear-gradient(135deg, #f87171, #dc2626);
+      --table-header-bg: linear-gradient(135deg, #dc2626, #b91c1c);
+      --btn-gradient: linear-gradient(135deg, #dc2626, #b91c1c);
+      --input-focus: #ef4444;
+    }
+    [data-theme="rose"] {
+      --accent: #ec4899; --accent-dark: #be185d; --accent-rgb: 236, 72, 153;
+      --accent-gradient: linear-gradient(135deg, #f472b6, #db2777);
+      --table-header-bg: linear-gradient(135deg, #db2777, #be185d);
+      --btn-gradient: linear-gradient(135deg, #db2777, #be185d);
+      --input-focus: #ec4899;
+    }
+    html.night[data-theme="ocean"] {
+      --accent: #38bdf8; --accent-dark: #0284c7; --accent-rgb: 56, 189, 248;
+      --accent-gradient: linear-gradient(135deg, #7dd3fc, #38bdf8);
+      --table-header-bg: linear-gradient(135deg, #0369a1, #075985);
+      --btn-gradient: linear-gradient(135deg, #0284c7, #0369a1);
+      --input-focus: #38bdf8;
+    }
+    html.night[data-theme="forest"] {
+      --accent: #34d399; --accent-dark: #059669; --accent-rgb: 52, 211, 153;
+      --accent-gradient: linear-gradient(135deg, #6ee7b7, #34d399);
+      --table-header-bg: linear-gradient(135deg, #047857, #065f46);
+      --btn-gradient: linear-gradient(135deg, #059669, #047857);
+      --input-focus: #34d399;
+    }
+    html.night[data-theme="teal"] {
+      --accent: #2dd4bf; --accent-dark: #0d9488; --accent-rgb: 45, 212, 191;
+      --accent-gradient: linear-gradient(135deg, #5eead4, #2dd4bf);
+      --table-header-bg: linear-gradient(135deg, #0f766e, #115e59);
+      --btn-gradient: linear-gradient(135deg, #0d9488, #0f766e);
+      --input-focus: #2dd4bf;
+    }
+    html.night[data-theme="amber"] {
+      --accent: #fbbf24; --accent-dark: #d97706; --accent-rgb: 251, 191, 36;
+      --accent-gradient: linear-gradient(135deg, #fde68a, #fbbf24);
+      --table-header-bg: linear-gradient(135deg, #b45309, #92400e);
+      --btn-gradient: linear-gradient(135deg, #d97706, #b45309);
+      --input-focus: #fbbf24;
+    }
+    html.night[data-theme="ruby"] {
+      --accent: #f87171; --accent-dark: #dc2626; --accent-rgb: 248, 113, 113;
+      --accent-gradient: linear-gradient(135deg, #fca5a5, #f87171);
+      --table-header-bg: linear-gradient(135deg, #b91c1c, #991b1b);
+      --btn-gradient: linear-gradient(135deg, #dc2626, #b91c1c);
+      --input-focus: #f87171;
+    }
+    html.night[data-theme="rose"] {
+      --accent: #f472b6; --accent-dark: #db2777; --accent-rgb: 244, 114, 182;
+      --accent-gradient: linear-gradient(135deg, #fbcfe8, #f472b6);
+      --table-header-bg: linear-gradient(135deg, #be185d, #9d174d);
+      --btn-gradient: linear-gradient(135deg, #db2777, #be185d);
+      --input-focus: #f472b6;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #1a1a2e; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+    body {
+      background: var(--app-bg);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      transition: background-color 0.3s, color 0.3s;
+    }
 
     #toolbar {
-      background: #16213e;
+      background: var(--command-block-bg);
       padding: 8px 12px;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
-      border-bottom: 1px solid #0f3460;
+      border-bottom: 1px solid var(--border-color);
+      transition: background-color 0.3s, border-color 0.3s;
     }
-    #toolbar label { font-size: 12px; color: #aaa; }
+    #toolbar label { font-size: 12px; color: var(--text-muted); }
     #toolbar input {
-      background: #0f3460;
-      border: 1px solid #444;
-      color: #eee;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-primary);
       padding: 4px 6px;
       border-radius: 4px;
       font-size: 13px;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+    #toolbar input:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 2px var(--accent-soft);
     }
     #toolbar input[type=number] { width: 70px; }
     #toolbar input[type=text], #toolbar input[type=password] { width: 130px; }
+    /* Кастомный дропдаун истории ПК (datalist фильтрует по значению поля —
+       показывал только 1 совпадение, поэтому свой список) */
+    .host-wrap { position: relative; display: inline-block; }
+    .host-wrap #host { width: 130px; padding-right: 22px; }
+    .host-toggle {
+      position: absolute;
+      right: 3px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1;
+      padding: 2px 3px;
+    }
+    .host-toggle:hover { color: var(--accent); }
+    .host-drop {
+      position: absolute;
+      top: calc(100% + 3px);
+      left: 0;
+      z-index: 50;
+      min-width: 100%;
+      background: var(--modal-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .host-opt {
+      display: block;
+      width: 100%;
+      padding: 5px 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .host-opt:hover { background: var(--accent-soft); color: var(--accent); }
+    .host-opt-empty { padding: 5px 8px; color: var(--text-muted); font-size: 12px; }
+    #toolbar select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-primary);
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+    #toolbar select:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    /* Чекбоксы (галки) — цвет по теме панели */
+    input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
     #connectBtn {
-      background: #e94560;
-      color: white;
+      background: var(--btn-gradient);
+      color: var(--btn-text);
       border: none;
       padding: 5px 14px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 13px;
       font-weight: bold;
+      box-shadow: var(--btn-shadow);
+      transition: box-shadow 0.2s, filter 0.2s;
     }
-    #connectBtn:hover { background: #c73652; }
-    #connectBtn.connected { background: #2ecc71; }
-    #connectBtn.connected:hover { background: #27ae60; }
-    #status { font-size: 12px; color: #aaa; margin-left: 8px; }
+    #connectBtn:hover { box-shadow: var(--btn-hover-shadow); filter: brightness(1.05); }
+    #connectBtn.connected { background: var(--btn-success); background-image: none; }
+    #connectBtn.connected:hover { background: var(--btn-success); background-image: none; filter: brightness(1.1); }
+    #micBtn {
+      background: var(--btn-gradient);
+      color: var(--btn-text);
+      border: none;
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: var(--btn-shadow);
+      transition: box-shadow 0.2s, filter 0.2s;
+      opacity: 1;
+    }
+    #micBtn:hover { box-shadow: var(--btn-hover-shadow); filter: brightness(1.05); }
+    #micBtn:disabled { cursor: not-allowed; opacity: 0.35; }
+    #micBtn.armed { opacity: 1; outline: 2px solid var(--btn-success); }
+    #micBtn.live { opacity: 1; background: var(--btn-danger); background-image: none; }
+    #miniMic {
+      font-size: 12px; color: var(--text-muted); white-space: nowrap;
+      background: none; border: none; padding: 0 2px; cursor: pointer; font-family: inherit;
+    }
+    #miniMic.live { color: var(--btn-danger); font-weight: bold; }
+    #miniLevel {
+      width: 44px; height: 4px; border-radius: 2px; overflow: hidden; flex-shrink: 0;
+      background: var(--input-bg); border: 1px solid var(--input-border);
+    }
+    #miniLevel i { display: block; height: 100%; width: 0; background: var(--btn-success); }
+    #miniConnBtn {
+      font-size: 11px; padding: 2px 8px; border: none; border-radius: 3px; white-space: nowrap;
+      background: var(--btn-gradient); color: var(--btn-text); cursor: pointer;
+      box-shadow: var(--btn-shadow); transition: box-shadow 0.2s, filter 0.2s;
+    }
+    #miniConnBtn:hover { box-shadow: var(--btn-hover-shadow); filter: brightness(1.05); }
+    /* Индикатор уровня микрофона (пик сигнала, обновляется из micProcess) */
+    #micLevel {
+      display: inline-block;
+      width: 52px;
+      height: 8px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 3px;
+      overflow: hidden;
+      vertical-align: middle;
+    }
+    #micLevel i { display: block; height: 100%; width: 0%; background: var(--btn-success); }
+    #micDevice { max-width: 150px; font-size: 12px; }
+    #fitBtn, #fsBtn {
+      background: var(--btn-gradient);
+      color: var(--btn-text);
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: var(--btn-shadow);
+      transition: box-shadow 0.2s, filter 0.2s;
+    }
+    #fitBtn:hover, #fsBtn:hover { box-shadow: var(--btn-hover-shadow); filter: brightness(1.05); }
+    #fitBtn.on { background: var(--btn-success); background-image: none; }
+    /* «Вписать»: canvas масштабируется CSS-ом (координаты мыши считает canvasXY) */
+    #canvasWrapper.fit { overflow: hidden; align-items: center; }
+    #canvasWrapper.fit #rdpCanvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+    #status { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
 
     #canvasWrapper {
       flex: 1;
@@ -56,12 +371,175 @@
       cursor: none;
       outline: none;
     }
+
+    /* Тонкий темизированный скроллбар в стиле панели Entware Manager */
+    #canvasWrapper::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    #canvasWrapper::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    #canvasWrapper::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 4px;
+    }
+    #canvasWrapper::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+    #canvasWrapper {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    /* ── Сворачивание панели управления ─────────────────────────────── */
+    #toolbar.collapsed { display: none; }
+
+    /* Кнопка-стрелка в стиле панели: тонкий chevron через border */
+    .collapse-arrow {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 6px;
+      transition: background-color 0.2s, color 0.2s;
+      /* Пульсация стрелки в цвет темы — заметна и в тулбаре, и в островке */
+      animation: collapseArrowPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes collapseArrowPulse {
+      0%, 100% { color: var(--text-secondary); text-shadow: none; }
+      50%      { color: var(--accent); text-shadow: 0 0 6px var(--accent-glow), 0 0 12px var(--accent-glow); }
+    }
+    .collapse-arrow:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+      animation: none;
+    }
+    .collapse-arrow i {
+      width: 8px;
+      height: 8px;
+      border: solid currentColor;
+      border-width: 0 2px 2px 0;
+      display: inline-block;
+      box-sizing: border-box;
+    }
+    .collapse-arrow.up i { transform: rotate(225deg); margin-top: 4px; }
+    .collapse-arrow.down i { transform: rotate(45deg); margin-bottom: 4px; }
+
+    /* Плавающий островок при свёрнутой панели: зона хвата + кнопка + FPS + пинг */
+    #miniPanel {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 100;
+      background: var(--command-block-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      transition: background-color 0.3s, border-color 0.3s;
+      cursor: move;
+      user-select: none;
+    }
+    #miniPanel.visible { display: flex; }
+    #miniPanel.dragging { opacity: 0.85; cursor: grabbing; }
+    #miniGrip {
+      width: 4px;
+      height: 18px;
+      border-left: 2px solid var(--border-color);
+      border-right: 2px solid var(--border-color);
+      border-radius: 1px;
+      cursor: move;
+      flex-shrink: 0;
+    }
+    #miniFps { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    #miniPing { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    #miniPagePing { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
   </style>
+  <script>
+    // Синхронизация темы с панелью Entware Manager.
+    // В iframe (тот же origin) копируем актуальные CSS-переменные из родителя —
+    // любой пресет и день/ночь применяются автоматически. При standalone-открытии
+    // (новая вкладка) — читаем localStorage панели + свои fallback-переменные выше.
+    (function() {
+      'use strict';
+      var root = document.documentElement;
+      var VARS = [
+        '--bg-gradient', '--app-bg', '--app-border', '--sidebar-bg', '--sidebar-border',
+        '--content-bg', '--text-primary', '--text-secondary', '--text-muted',
+        '--accent', '--accent-dark', '--accent-rgb', '--accent-gradient', '--accent-soft',
+        '--accent-glow', '--table-header-bg', '--btn-gradient', '--border-color',
+        '--table-bg', '--table-row-even', '--table-row-hover', '--input-bg', '--input-border',
+        '--input-focus', '--modal-bg', '--pre-bg', '--shadow', '--shadow-lg', '--progress-bg',
+        '--command-block-bg', '--note-border', '--btn-bg', '--btn-text', '--btn-shadow',
+        '--btn-hover-shadow', '--btn-disabled-opacity', '--btn-success', '--btn-danger',
+        '--btn-muted', '--scrollbar-thumb', '--scrollbar-track'
+      ];
+
+      function applyStorageTheme() {
+        try {
+          var theme = localStorage.getItem('entware_theme') || 'violet';
+          var nightRaw = localStorage.getItem('entware_night');
+          var night = nightRaw === null ? (new Date().getHours() >= 20 || new Date().getHours() < 6) : nightRaw === '1';
+          root.setAttribute('data-theme', theme);
+          if (night) root.classList.add('night'); else root.classList.remove('night');
+        } catch (e) {}
+      }
+
+      function syncFromParent() {
+        try {
+          if (window.parent === window) return false;
+          var pRoot = window.parent.document.documentElement;
+          var theme = pRoot.getAttribute('data-theme');
+          if (!theme) return false;
+          var cs = window.parent.getComputedStyle(pRoot);
+          for (var i = 0; i < VARS.length; i++) {
+            var v = cs.getPropertyValue(VARS[i]).trim();
+            if (v) root.style.setProperty(VARS[i], v);
+          }
+          root.setAttribute('data-theme', theme);
+          if (pRoot.classList.contains('night')) root.classList.add('night');
+          else root.classList.remove('night');
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function watchParent() {
+        try {
+          if (window.parent === window) return;
+          var pRoot = window.parent.document.documentElement;
+          if (!pRoot.getAttribute('data-theme')) return;
+          new MutationObserver(function() { syncFromParent(); })
+            .observe(pRoot, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+        } catch (e) {}
+      }
+
+      if (!syncFromParent()) applyStorageTheme();
+      if (document.readyState === 'complete') watchParent();
+      else window.addEventListener('load', watchParent);
+    })();
+  </script>
 </head>
 <body>
   <div id="toolbar">
     <label>Host</label>
-    <input type="text" id="host" value="localhost" placeholder="RDP host" />
+    <div class="host-wrap">
+      <input type="text" id="host" value="localhost" placeholder="RDP host" autocomplete="off" />
+      <button type="button" id="hostToggle" class="host-toggle" title="История: последние 5">▾</button>
+      <div id="hostDrop" class="host-drop" hidden></div>
+    </div>
     <label>Port</label>
     <input type="number" id="port" value="3389" />
     <label>Domain</label>
@@ -74,21 +552,62 @@
     <input type="number" id="width" value="1280" />
     <label>Height</label>
     <input type="number" id="height" value="800" />
-    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+    <label>Quality</label>
+    <input type="number" id="queueDepth" value="20" title="queueDepth: 0 = макс. качество, больше = сильнее сжатие (быстрее, но мыльнее). Для режима «Битмапы» ставьте 0–10" style="width:55px;" />
+    <label>Preset</label>
+    <select id="preset" onchange="applyPreset()">
+      <option value="compact">Compact (skorost')</option>
+      <option value="balanced" selected>Balanced (1280x800)</option>
+      <option value="crisp">Crisp (1920x1080)</option>
+      <option value="custom">Custom</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="Поменять местами клавиши Alt и Meta (Super/Win): полезно на macOS, где клавиша Cmd должна работать как Alt в Windows">
       <input type="checkbox" id="swapAltMeta" />
       Swap Alt/Meta
     </label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="Отключить H.264: сервер шлёт RemoteFX/NSCodec (битмапы). Стабильнее через медленные/буферизующие каналы (Keenetic), но больше трафика">
+      <input type="checkbox" id="noH264" onchange="saveCookies()" />
+      Битмапы (без H.264)
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="Если курсор на удалённом ПК не виден (например, в Radmin), показывать локальную стрелку вместо скрытого системного курсора">
+      <input type="checkbox" id="alwaysCursor" onchange="saveCookies()" />
+      Курсор всегда
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="Запросить перенаправление микрофона у сервера (INFO_AUDIOCAPTURE). Применяется при подключении — если переключить в активной сессии, нужно переподключиться"><input type="checkbox" id="micRequest" checked /> Микрофон в сессии</label>
+    <button id="micBtn" onclick="micToggle()" title="Включить микрофон (передача в RDP-сессию)">Микрофон</button>
+    <span id="micLevel" title="Уровень сигнала микрофона (активен при включённом микрофоне)"><i></i></span>
+    <select id="micDevice" onchange="micDeviceChanged()" title="Устройство ввода (микрофон). Список заполняется после первого разрешения доступа"><option value="">Микрофон: по умолчанию</option></select>
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer" title="Показывать диагностику микрофона (шаги audin, формат, пик сигнала). По умолчанию выключено"><input type="checkbox" id="micDiag" onchange="micDiagChanged()" /> Диагностика</label>
+    <button id="fitBtn" onclick="toggleFit()" title="Вписать картинку в окно (только отображение; координаты мыши пересчитываются)">Вписать</button>
+    <button id="fsBtn" onclick="toggleFullscreen()" title="Во весь экран (Esc — выход)">Экран</button>
     <button id="connectBtn" onclick="toggleConnect()">Connect</button>
     <span id="status">Loading WASM…</span>
+    <button id="collapseBtn" class="collapse-arrow up" title="Свернуть панель управления"><i></i></button>
+  </div>
+  <div id="miniPanel">
+    <span id="miniGrip" title="Перетащите, чтобы переместить панель"></span>
+    <button id="expandBtn" class="collapse-arrow down" title="Развернуть панель управления"><i></i></button>
+    <button id="miniConnBtn" onclick="toggleConnect()" style="display:none" title="Подключиться к сессии">Подключиться</button>
+    <span id="miniFps"></span>
+    <span id="miniPagePing"></span>
+    <span id="miniPing"></span>
+    <button id="miniMic" onclick="micToggle()" style="display:none" title="Микрофон: нажать чтобы включить/выключить"></button>
+    <span id="miniLevel" style="display:none"><i></i></span>
+    <button id="micToggleBtn" onclick="micToggleDebug()" style="display:none;font-size:11px;padding:3px 10px;" title="Показать или скрыть диагностику микрофона">Диагностика микрофона ▾</button>
+    <div id="micDebug" style="display:none;flex-basis:100%;max-height:120px;overflow:auto;white-space:pre-wrap;user-select:text;font-family:monospace;font-size:11px;line-height:1.35;color:var(--text-muted)" title="Диагностика микрофона (audin): по одной строке на шаг и на канал"></div>
+    <button id="micCopyBtn" onclick="micCopyDebug()" style="display:none;font-size:11px;padding:3px 10px;" title="Скопировать всю диагностику микрофона в буфер обмена">Скопировать диагностику</button>
   </div>
   <div id="canvasWrapper">
     <canvas id="rdpCanvas" tabindex="0"></canvas>
+    <textarea id="rdpPasteBridge" aria-hidden="true" tabindex="-1"
+      style="position:fixed; top:0; left:0; width:2px; height:2px; opacity:0; border:none; padding:0; margin:0; resize:none;"></textarea>
   </div>
 
   <script src="wasm_exec.js"></script>
   <script>
     const go = new Go();
     let connected = false;
+    let everConnected = false;   // были ли уже подключены (текст кнопки в островке)
 
     // ── Cookie helpers ────────────────────────────────────────────────────────
     function setCookie(name, value) {
@@ -111,14 +630,248 @@
       }
       const sam = getCookie('rdp_swapAltMeta');
       if (sam !== null) document.getElementById('swapAltMeta').checked = (sam === '1');
+      const noh = getCookie('rdp_noH264');
+      if (noh !== null) document.getElementById('noH264').checked = (noh === '1');
+      const ac = getCookie('rdp_always_cursor');
+      if (ac !== null) document.getElementById('alwaysCursor').checked = (ac === '1');
+      const md = getCookie('rdp_micdiag');
+      const mdEl = document.getElementById('micDiag');
+      if (mdEl && md !== null) mdEl.checked = (md === '1');
+      if (getCookie('rdp_fit') === '1') applyFit(true);
+      const preset = getCookie('rdp_preset');
+      if (preset && PRESETS[preset]) {
+        document.getElementById('preset').value = preset;
+        applyPreset();
+      } else {
+        const qd = getCookie('rdp_queueDepth');
+        if (qd !== null) {
+          const el = document.getElementById('queueDepth');
+          if (el) el.value = qd;
+        }
+      }
     }
+    // Stream presets: width/height + queueDepth hint (grdp SetQueueDepthHint:
+    // 0 = no throttle (max quality), larger = heavier throttle of rate/quality).
+    // В режиме «Битмапы» качество напрямую зависит от queueDepth: 0 = чётко.
+    const PRESETS = {
+      compact:  { width: 1024, height: 600, depth: 10 },
+      balanced: { width: 1280, height: 800, depth: 5 },
+      crisp:    { width: 1920, height: 1080, depth: 0 },
+      custom:   { width: 0,    height: 0,    depth: 0 },
+    };
+
+    function applyPreset() {
+      const name = document.getElementById('preset').value;
+      const p = PRESETS[name];
+      if (!p) return;
+      if (name !== 'custom') {
+        document.getElementById('width').value = p.width;
+        document.getElementById('height').value = p.height;
+      }
+      const qd = document.getElementById('queueDepth');
+      if (qd) qd.value = p.depth;
+      saveCookies();
+    }
+
     function saveCookies() {
       for (const id of ['host', 'port', 'domain', 'width', 'height']) {
         setCookie('rdp_' + id, document.getElementById(id).value.trim());
       }
       setCookie('rdp_swapAltMeta', document.getElementById('swapAltMeta').checked ? '1' : '0');
+      setCookie('rdp_noH264', document.getElementById('noH264').checked ? '1' : '0');
+      setCookie('rdp_always_cursor', document.getElementById('alwaysCursor').checked ? '1' : '0');
+      const md = document.getElementById('micDiag');
+      if (md) setCookie('rdp_micdiag', md.checked ? '1' : '0');
+      const qd = document.getElementById('queueDepth');
+      if (qd) setCookie('rdp_queueDepth', qd.value);
+      const pr = document.getElementById('preset');
+      if (pr) setCookie('rdp_preset', pr.value);
     }
+
+    // ── Сворачивание панели управления ───────────────────────────────────────
+    // Свёрнутая панель заменяется плавающим островком (#miniPanel) с кнопкой
+    // «Параметры» для раскрытия и счётчиком FPS. Состояние — cookie rdp_collapsed.
+    function initCollapse() {
+      const toolbar = document.getElementById('toolbar');
+      const mini = document.getElementById('miniPanel');
+      const collapseBtn = document.getElementById('collapseBtn');
+      const expandBtn = document.getElementById('expandBtn');
+      if (!toolbar || !mini) return;
+
+      function setCollapsed(collapsed) {
+        toolbar.classList.toggle('collapsed', collapsed);
+        mini.classList.toggle('visible', collapsed);
+        setCookie('rdp_collapsed', collapsed ? '1' : '0');
+      }
+
+      const saved = getCookie('rdp_collapsed');
+      setCollapsed(saved === '1');
+
+      if (collapseBtn) collapseBtn.onclick = function() { setCollapsed(true); };
+      if (expandBtn) expandBtn.onclick = function() { setCollapsed(false); };
+      updateMiniConn();
+
+      // ── Перетаскивание островка ─────────────────────────────────────────────
+      // Зона захвата — #miniGrip (и вся панель). Позиция сохраняется в cookie
+      // rdp_mini_pos (JSON {x,y} от верхнего левого угла окна).
+      const savedPos = getCookie('rdp_mini_pos');
+      if (savedPos) {
+        try {
+          const p = JSON.parse(savedPos);
+          if (typeof p.x === 'number' && typeof p.y === 'number') {
+            mini.style.left = p.x + 'px';
+            mini.style.top = p.y + 'px';
+            mini.style.right = 'auto';
+          }
+        } catch (_) {}
+      }
+
+      let dragStartX = 0, dragStartY = 0, dragBaseX = 0, dragBaseY = 0, dragging = false;
+
+      function onDragMove(e) {
+        if (!dragging) return;
+        const dx = (e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX)) - dragStartX;
+        const dy = (e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY)) - dragStartY;
+        let nx = dragBaseX + dx;
+        let ny = dragBaseY + dy;
+        nx = Math.max(0, Math.min(window.innerWidth - mini.offsetWidth, nx));
+        ny = Math.max(0, Math.min(window.innerHeight - mini.offsetHeight, ny));
+        mini.style.left = nx + 'px';
+        mini.style.top = ny + 'px';
+        mini.style.right = 'auto';
+      }
+
+      function onDragEnd() {
+        if (!dragging) return;
+        dragging = false;
+        mini.classList.remove('dragging');
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('touchend', onDragEnd);
+        try {
+          setCookie('rdp_mini_pos', JSON.stringify({
+            x: parseInt(mini.style.left, 10) || 0,
+            y: parseInt(mini.style.top, 10) || 0
+          }));
+        } catch (_) {}
+      }
+
+      function onDragStart(e) {
+        // не перетаскиваем, если клик пришёлся по кнопке (раскрытие,
+        // подключение, микрофон, диагностика) — иначе клик по ним съедается
+        if (e.target && e.target.closest && e.target.closest('button')) return;
+        dragging = true;
+        mini.classList.add('dragging');
+        const cx = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX);
+        const cy = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY);
+        dragStartX = cx;
+        dragStartY = cy;
+        dragBaseX = mini.offsetLeft;
+        dragBaseY = mini.offsetTop;
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+        e.preventDefault();
+      }
+
+      const grip = document.getElementById('miniGrip');
+      if (grip) {
+        grip.addEventListener('mousedown', onDragStart);
+        grip.addEventListener('touchstart', onDragStart, { passive: false });
+      }
+      // перетаскивание и за пустую область самой панели (не по кнопке)
+      mini.addEventListener('mousedown', onDragStart);
+      mini.addEventListener('touchstart', onDragStart, { passive: false });
+    }
+
+    // ── История хостов (последние 5, выбор через кастомный дропдаун) ──────────
+    const HOST_HISTORY_COOKIE = 'rdp_host_history';
+    const HOST_HISTORY_MAX = 5;
+
+    function loadHostHistory() {
+      const drop = document.getElementById('hostDrop');
+      if (!drop) return;
+      const raw = getCookie(HOST_HISTORY_COOKIE);
+      let hosts = [];
+      if (raw) {
+        try { hosts = JSON.parse(raw); } catch (_) { hosts = []; }
+      }
+      drop.innerHTML = '';
+      if (hosts.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'host-opt-empty';
+        empty.textContent = 'История пуста';
+        drop.appendChild(empty);
+        return;
+      }
+      for (let i = 0; i < hosts.length; i++) {
+        (function(h) {
+          const opt = document.createElement('button');
+          opt.type = 'button';
+          opt.className = 'host-opt';
+          opt.textContent = h;
+          opt.onclick = function() {
+            document.getElementById('host').value = h;
+            hideHostDrop();
+          };
+          drop.appendChild(opt);
+        })(hosts[i]);
+      }
+    }
+
+    function showHostDrop() {
+      const drop = document.getElementById('hostDrop');
+      if (!drop) return;
+      loadHostHistory();
+      drop.hidden = false;
+    }
+    function hideHostDrop() {
+      const drop = document.getElementById('hostDrop');
+      if (drop) drop.hidden = true;
+    }
+    function toggleHostDrop() {
+      const drop = document.getElementById('hostDrop');
+      if (!drop) return;
+      if (drop.hidden) showHostDrop(); else hideHostDrop();
+    }
+    document.addEventListener('click', function(e) {
+      const wrap = document.querySelector('.host-wrap');
+      if (wrap && !wrap.contains(e.target)) hideHostDrop();
+    });
+
+    // Запоминаем адрес при клике Connect (история = то, что запускали).
+    function rememberHost(host) {
+      if (!host) return;
+      const raw = getCookie(HOST_HISTORY_COOKIE);
+      let hosts = [];
+      if (raw) {
+        try { hosts = JSON.parse(raw); } catch (_) { hosts = []; }
+      }
+      hosts = hosts.filter(function(h) { return h !== host; });
+      hosts.unshift(host);
+      if (hosts.length > HOST_HISTORY_MAX) hosts.length = HOST_HISTORY_MAX;
+      setCookie(HOST_HISTORY_COOKIE, JSON.stringify(hosts));
+      loadHostHistory();
+    }
+
     loadCookies();
+    loadHostHistory();
+    initCollapse();
+    const hostToggleEl = document.getElementById('hostToggle');
+    if (hostToggleEl) hostToggleEl.onclick = toggleHostDrop;
+
+    // Enter в поле пароля запускает подключение (как клик по Connect).
+    const pwEl = document.getElementById('password');
+    if (pwEl) {
+      pwEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          toggleConnect();
+        }
+      });
+    }
 
     // ── Web Audio PCM scheduler ───────────────────────────────────────────────
     // AudioContext is created in doConnect() while a user gesture is active,
@@ -174,48 +927,919 @@
       audioNextAt += audioBuf.duration;
     }
 
+    // Диагностика: дополнительные early-capability флаги из адреса
+    // (например, ?flags=0x0040 или ?flags=64). Читаются при подключении.
+    (function () {
+      const m = /[?&]flags=([^&]+)/.exec(window.location.search);
+      if (!m) return;
+      const raw = decodeURIComponent(m[1]);
+      const v = /^0x/i.test(raw) ? parseInt(raw, 16) : parseInt(raw, 10);
+      if (!isNaN(v)) window.rdpExtraFlags = v;
+    })();
+
+    // ── Microphone capture (MS-RDPEAI, browser mic → server) ──────────────
+    // Microphone works only in a secure context (HTTPS, e.g. panel :8443).
+    // Over plain HTTP (LAN :8087) the toggle is disabled with a hint.
+    // Захват: getUserMedia → AudioContext → AudioWorklet (аудиопоток, без
+    // потерь от занятости главного потока) → Int16 PCM → ровные пакеты по
+    // FramesPerPacket (10 мс) → rdpMicPush. Обработка звука (AEC/шумодав/AGC)
+    // выключена: она занижала уровень и «гейтила» тихую речь.
+    // Worklet собирается из строки через Blob URL — отдельных файлов не нужно.
+    const MIC_WORKLET_SRC = [
+      "class MicCapture extends AudioWorkletProcessor {",
+"  constructor(opts) {",
+      "    super();",
+      "    const o = (opts && opts.processorOptions) || {};",
+      "    this.outRate = o.rate | 0;",
+      "    this.outCh = (o.outCh | 0) || 1;",
+      "    this.fpp = (o.framesPerPacket | 0) || 160;",
+      "    this.gain = o.gain !== undefined ? o.gain : 3.5;",
+      "    this.ratio = this.outRate > 0 ? sampleRate / this.outRate : 1;",
+      "    this.pos = 0;",
+      "    this.buf = new Int16Array(0);
+      
+      this.buf = new Int16Array(0); this.pos = 0;",
+      "    this.port.onmessage = (e) => {",
+      "      const d = e.data || {};",
+      "      if (d.rate !== undefined) {",
+      "        this.outRate = d.rate | 0;",
+      "        this.ratio = this.outRate > 0 ? sampleRate / this.outRate : 1;",
+      "      }",
+      "      if (d.outCh !== undefined) this.outCh = (d.outCh | 0) || 1;",
+      "      if (d.framesPerPacket !== undefined) this.fpp = (d.framesPerPacket | 0) || 160;",
+      "      if (d.gain !== undefined) this.gain = d.gain;",
+      "      if (d.reset) { this.buf = new Int16Array(0);
+      
+      this.buf = new Int16Array(0); this.pos = 0; this.pos = 0; }",
+      "    };",
+      "  }",
+      "  append(samples) {",
+      "    const next = new Int16Array(this.buf.length + samples.length);",
+      "    next.set(this.buf, 0);",
+      "    next.set(samples, this.buf.length);",
+      "    this.buf = next;",
+      "    const pkt = this.fpp * this.outCh;",
+      "    while (this.buf.length >= pkt) {",
+      "      const packet = this.buf.slice(0, pkt);",
+      "      this.buf = this.buf.slice(pkt);",
+      "      let peak = 0;",
+      "      for (let i = 0; i < packet.length; i++) {",
+      "        const v = packet[i] < 0 ? -packet[i] : packet[i];",
+      "        if (v > peak) peak = v;",
+      "      }",
+      "      this.port.postMessage({ pcm: packet.buffer, peak: peak }, [packet.buffer]);",
+      "    }",
+      "    const cap = 2 * sampleRate * this.outCh;", // ~2 c запасa
+      "    if (this.buf.length > cap) this.buf = this.buf.slice(this.buf.length - cap);",
+      "  }",
+      "  process(inputs) {",
+      "    const inp = inputs[0];",
+      "    if (!inp || inp.length === 0 || !inp[0]) return true;",
+      "    const n = inp[0].length;",
+      "    const inCh = inp.length;",
+      "    if (this.ratio === 1) {",
+      "      const out = new Int16Array(n * this.outCh);",
+      "      for (let j = 0; j < n; j++) {",
+      "        for (let c = 0; c < this.outCh; c++) {",
+      "          const src = inp[c < inCh ? c : 0];",
+      "          let v = src[j] * this.gain;",
+      
+      
+      
+      
+      
+      
+      "          }",
+      "          if (v > 1) v = 1; else if (v < -1) v = -1;",
+      "          out[j * this.outCh + c] = Math.round(v * 32767);",
+      "        }",
+      "      }",
+      "      this.append(out);",
+      "      return true;",
+      "    }",
+      "    let frames = Math.ceil(n / this.ratio) + 1;",
+      "    const out = new Int16Array(frames * this.outCh);",
+      "    let p = this.pos;",
+      "    let j = 0;",
+      "    while (p < n && j < frames) {",
+      "      let i0 = Math.floor(p);",
+      "      const f = p - i0;",
+      "      let i1 = i0 + 1;",
+      "      if (i0 > n - 1) i0 = n - 1;",
+      "      if (i1 > n - 1) i1 = n - 1;",
+      "      for (let c = 0; c < this.outCh; c++) {",
+      "        const src = inp[c < inCh ? c : 0];",
+      "        let v = (src[i0] + (src[i1] - src[i0]) * f) * this.gain;",
+
+      
+      
+      
+      
+      
+      
+      "        }",
+      "        if (v > 1) v = 1; else if (v < -1) v = -1;",
+      "        out[j * this.outCh + c] = Math.round(v * 32767);",
+      "      }",
+      "      j++;",
+      "      p += this.ratio;",
+      "    }",
+      "    this.pos = p - n;",
+      "    this.append(j === frames ? out : out.slice(0, j * this.outCh));",
+      "    return true;",
+      "  }",
+      "}",
+      "registerProcessor('mic-capture', MicCapture);"
+    ].join('\n');
+    let micStream = null;
+    let micCtx = null;
+    let micProc = null;
+    let micSilent = null;
+    let micArmed = false;   // UI toggle: user allowed mic use
+    let micDebugOpen = false; // раскрыт ли блок диагностики (по умолчанию — нет)
+    let micLive = false;    // server holds capture open (rdpOnMicOpen)
+    let micRate = 0;        // agreed sample rate from server
+    let micCh = 0;          // agreed channel count from server
+    let micFpp = 0;         // FramesPerPacket из OPEN (размер пакета данных)
+    let micNode = null;     // AudioWorkletNode — основной путь захвата
+    let micNodeSrc = null;  // MediaStreamAudioSourceNode
+    let micWorkletURL = null;
+    let micRateTimer = null; // метрика «кБ/с отправки»
+    let micRateBytes = 0;
+    let micRateLast = 0;
+
+    let micLevelTimer = null;
+
+    function micSecure() { return window.isSecureContext === true; }
+
+    // micSavedDevice — сохранённый deviceId (cookie rdp_micdev).
+    function micSavedDevice() { return getCookie('rdp_micdev') || ''; }
+
+    // micRefreshDevices заполняет список устройств ввода. Метки появляются
+    // только после выдачи разрешения, поэтому вызывается и при включении.
+    async function micRefreshDevices() {
+      const sel = document.getElementById('micDevice');
+      if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      try {
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const cur = sel.value || micSavedDevice();
+        sel.textContent = '';
+        const def = document.createElement('option');
+        def.value = '';
+        def.textContent = 'Микрофон: по умолчанию';
+        sel.appendChild(def);
+        let n = 0;
+        let haveIds = false;   // до выдачи разрешения браузер отдаёт пустые id
+        const ids = [];
+        devs.forEach(function (d) {
+          if (d.kind !== 'audioinput') return;
+          n++;
+          if (d.deviceId) { haveIds = true; ids.push(d.deviceId); }
+          const o = document.createElement('option');
+          o.value = d.deviceId || '';
+          o.textContent = d.label || ('Микрофон ' + n);
+          sel.appendChild(o);
+        });
+        // Устройство могло исчезнуть (наушники отключили) — тогда saved id
+        // приведёт к OverconstrainedError; чистим куку. Но только если список
+        // реально содержит deviceId: иначе (нет разрешения) не трогаем.
+        if (cur && haveIds && ids.indexOf(cur) === -1) {
+          sel.value = '';
+          setCookie('rdp_micdev', '');
+        } else if (cur && ids.indexOf(cur) !== -1) {
+          sel.value = cur;
+        }
+      } catch (_) {}
+    }
+
+    // micDeviceChanged — сменили устройство: перезапустить захват, если включён.
+    function micDeviceChanged() {
+      const sel = document.getElementById('micDevice');
+      if (!sel) return;
+      setCookie('rdp_micdev', sel.value || '');
+      if (micArmed) { micStop(); micToggle(); }
+    }
+
+    // micLevelShow — полоска уровня по накопленному пику (масштаб ×3 для наглядности).
+    function micLevelShow() {
+      const pct = Math.min(100, Math.round(micPeak / 32768 * 300));
+      const el = document.querySelector('#micLevel i');
+      if (el) el.style.width = pct + '%';
+      const mEl = document.querySelector('#miniLevel i');
+      if (mEl) mEl.style.width = pct + '%';
+    }
+
+    function micUpdateBtn() {
+      const b = document.getElementById('micBtn');
+      if (!b) return;
+      if (!micSecure()) {
+        b.disabled = true;
+        b.title = 'Микрофон доступен только по HTTPS (панель, порт 8443)';
+        return;
+      }
+      b.disabled = false;
+      // «live» (красная) = и захват включён, и сервер держит канал открытым.
+      const live = micLive && micArmed;
+      b.classList.toggle('armed', micArmed);
+      b.classList.toggle('live', live);
+      b.title = !micArmed ? 'Включить микрофон (передача в RDP-сессию)' :
+        (micLive ? 'Микрофон идёт в сессию — нажать чтобы выключить' :
+         'Микрофон включён, ждёт запроса от сервера — нажать чтобы выключить');
+      const m = document.getElementById('miniMic');
+      if (m) {
+        m.style.display = (micArmed && connected) ? '' : 'none';
+        m.classList.toggle('live', live);
+        m.textContent = live ? '● MIC' : '○ MIC';
+        m.title = b.title;
+      }
+      const lv = document.getElementById('miniLevel');
+      if (lv) lv.style.display = live ? '' : 'none';
+    }
+
+    // updateMiniConn — кнопка подключения в свёрнутом островке: видна, когда
+    // сессии нет (быстрое переподключение без разворачивания панели).
+    function updateMiniConn() {
+      const b = document.getElementById('miniConnBtn');
+      if (!b) return;
+      b.style.display = connected ? 'none' : '';
+      b.textContent = everConnected ? 'Переподключиться' : 'Подключиться';
+    }
+
+    // humanizeRdpError — типовые ошибки соединения человеческим языком.
+    // Точные формулировки Go/прокси нестабильны, поэтому матчим подстроки
+    // (регистр не важен); исходный текст остаётся в title строки статуса.
+    function humanizeRdpError(msg) {
+      const raw = String(msg || '');
+      const low = raw.toLowerCase();
+      const map = [
+        [['logon_failure', 'logon failure', 'invalid credentials', 'authentication failed',
+          'wrong password', 'account restrictions', 'nla'], 'Неверный логин или пароль (или домен)'],
+        [['account locked', 'locked out'], 'Учётная запись заблокирована на удалённом ПК'],
+        [['password expired', 'password must change'], 'Пароль истёк — его нужно сменить на удалённом ПК'],
+        [['reset by peer'], 'Соединение сброшено удалённой стороной'],
+        [['websocket closed', 'ws closed'], 'Соединение прервано: сессию закрыла удалённая сторона или сеть'],
+        [['websocket error', 'dial tcp', 'connection refused'], 'Не удалось подключиться: хост недоступен (RDP выключен или порт закрыт)'],
+        [['no route to host', 'network is unreachable'], 'Хост недоступен: нет маршрута (проверьте адрес и сеть)'],
+        [['timeout', 'deadline exceeded'], 'Превышено время ожидания: хост не отвечает'],
+        [['not allowed', 'forbidden'], 'Этот хост запрещён настройками прокси (allow-target)'],
+        [['tls', 'certificate', 'x509'], 'Ошибка TLS/сертификата при подключении'],
+        [['closed'], 'Сессия закрыта'],
+      ];
+      for (let i = 0; i < map.length; i++) {
+        const keys = map[i][0];
+        for (let j = 0; j < keys.length; j++) {
+          if (low.indexOf(keys[j]) !== -1) return map[i][1];
+        }
+      }
+      return raw || 'Неизвестная ошибка';
+    }
+
+    // micOnPacket — пакет PCM из worklet (уже ровно FramesPerPacket).
+    function micOnPacket(e) {
+      const d = e.data || {};
+      if (!d.pcm) return;
+      const u8 = new Uint8Array(d.pcm);
+      micChunks++;
+      micRateBytes += u8.length;
+      if (typeof d.peak === 'number' && d.peak > micPeak) micPeak = d.peak;
+      if (micChunks === 1) rdpOnMicProgress('capture');
+      else if (micChunks === 100) rdpOnMicProgress('capmany');
+      try {
+        if (typeof rdpMicPush === 'function') rdpMicPush(u8);
+      } catch (_) {}
+    }
+
+    // micRateMeterStart — раз в секунду показывает фактическую скорость
+    // отправки и ожидаемую (rate × каналы × 2 байта). Главная метрика
+    // для проверки «звук идёт в реальном времени».
+    function micRateMeterStart() {
+      micRateBytes = 0;
+      micRateLast = Date.now();
+      if (micRateTimer) clearInterval(micRateTimer);
+      micRateTimer = setInterval(function () {
+        const now = Date.now();
+        const dt = (now - micRateLast) / 1000;
+        micRateLast = now;
+        if (dt <= 0) return;
+        const got = Math.round(micRateBytes / dt / 1000);
+        micRateBytes = 0;
+        const exp = Math.round((micRate * (micCh || 1) * 2) / 1000);
+        rdpOnMicProgress('rate' + got + '/' + exp);
+      }, 1000);
+    }
+
+    // micStartCapture — подключить захват: AudioWorklet на аудиопотоке,
+    // при неудаче — прежний ScriptProcessor (фолбэк).
+    async function micStartCapture() {
+      const src = micCtx.createMediaStreamSource(micStream);
+      micNodeSrc = src;
+      micSilent = micCtx.createGain();
+      micSilent.gain.value = 0;
+      micSilent.connect(micCtx.destination);
+      let started = false;
+      if (micCtx.audioWorklet && typeof AudioWorkletNode === 'function') {
+        try {
+          if (!micWorkletURL) {
+            micWorkletURL = URL.createObjectURL(
+              new Blob([MIC_WORKLET_SRC], { type: 'application/javascript' }));
+          }
+          await micCtx.audioWorklet.addModule(micWorkletURL);
+          micNode = new AudioWorkletNode(micCtx, 'mic-capture', {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [1],
+processorOptions: {
+              rate: micRate | 0,
+              outCh: (micCh | 0) || 1,
+              framesPerPacket: (micFpp | 0) || 160,
+              gain: 5,
+            },
+          });
+          micNode.port.onmessage = micOnPacket;
+          src.connect(micNode);
+          micNode.connect(micSilent);
+          started = true;
+          rdpOnMicProgress('worklet');
+        } catch (_) {
+          try { if (micNode) micNode.disconnect(); } catch (_) {}
+          micNode = null;
+        }
+      }
+      if (!started) {
+        const inCh = src.channelCount || 1;
+        micProc = micCtx.createScriptProcessor(4096, inCh, inCh);
+        micProc.onaudioprocess = micProcess;
+        src.connect(micProc);
+        micProc.connect(micSilent);
+        rdpOnMicProgress('noworklet');
+      }
+      micRateMeterStart();
+    }
+
+    async function micToggle() {
+      if (!micSecure()) {
+        document.getElementById('status').textContent =
+          'Микрофон: нужен HTTPS (откройте панель по https, порт 8443)';
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        document.getElementById('status').textContent =
+          'Микрофон: браузер не даёт API захвата (mediaDevices недоступен)';
+        return;
+      }
+      if (typeof rdpMicPush !== 'function' || typeof rdpMicSetEnabled !== 'function') {
+        // Старый main.wasm из кеша (без audin): страница новая, а билд старый.
+        document.getElementById('status').textContent =
+          'WASM без микрофона — обновите страницу жёстко (Ctrl+F5)';
+        return;
+      }
+      if (micArmed) { micStop(); return; }
+      try {
+        if (!micStream) {
+          const dev = (document.getElementById('micDevice') || {}).value || micSavedDevice();
+          // Обработку звука выключаем: AEC/шумодав/AGC занижали уровень
+          // на 6-7 дБ и «гейтили» тихую речь (замерено по WAV).
+          const ac = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+          if (dev) ac.deviceId = { ideal: dev };
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: ac });
+          micRefreshDevices();
+        }
+        if (!micCtx || micCtx.state === 'closed') {
+          // Если сервер уже назвал частоту — просим контекст сразу на ней:
+          // тогда ресемплинг не нужен вовсе.
+          try {
+            micCtx = new AudioContext(micRate > 0 ? { sampleRate: micRate } : {});
+          } catch (_) {
+            micCtx = new AudioContext();
+          }
+        }
+        if (micCtx.state === 'suspended') await micCtx.resume();
+        await micStartCapture();
+        micArmed = true;
+        micPeak = 0;
+        micLevelShow();
+        if (micLevelTimer) clearInterval(micLevelTimer);
+        micLevelTimer = setInterval(function () {
+          micPeak = Math.floor(micPeak * 0.6);
+          micLevelShow();
+        }, 200);
+        rdpMicSetEnabled(true);
+        if (micLive && micRate > 0) {
+          document.getElementById('status').textContent =
+            'Connected · микрофон активен (' + micRate + ' Гц)';
+        }
+      } catch (e) {
+        document.getElementById('status').textContent =
+          'Микрофон недоступен: ' + (e && e.message ? e.message : e);
+        micStop();
+      }
+      micUpdateBtn();
+    }
+
+    function micStop() {
+      // micArmed — локальный выключатель, micLive — состояние сервера
+      // (audin OPEN). Здесь гасим только локальный: иначе после смены
+      // устройства или выкл→вкл звук не вернётся до переподключения.
+      micArmed = false;
+      try {
+        if (typeof rdpMicSetEnabled === 'function') rdpMicSetEnabled(false);
+      } catch (_) {}
+      try { if (micProc) micProc.disconnect(); } catch (_) {}
+      try { if (micNode) { micNode.port.onmessage = null; micNode.disconnect(); } } catch (_) {}
+      try { if (micNodeSrc) micNodeSrc.disconnect(); } catch (_) {}
+      try { if (micSilent) micSilent.disconnect(); } catch (_) {}
+      micProc = null;
+      micNode = null;
+      micNodeSrc = null;
+      micSilent = null;
+      if (micRateTimer) { clearInterval(micRateTimer); micRateTimer = null; }
+      if (micWorkletURL) {
+        try { URL.revokeObjectURL(micWorkletURL); } catch (_) {}
+        micWorkletURL = null;
+      }
+      if (micStream) {
+        try { micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (_) {}
+        micStream = null;
+      }
+      if (micCtx) {
+        try { micCtx.close(); } catch (_) {}
+        micCtx = null;
+      }
+      if (micLevelTimer) { clearInterval(micLevelTimer); micLevelTimer = null; }
+      micPeak = 0;
+      micLevelShow();
+      micUpdateBtn();
+    }
+
+    // Server opened capture (or changed format): remember it; actual
+    // pushing starts only when the user arms the mic (micToggle).
+    function rdpOnMicOpen(rate, channels, framesPerPacket) {
+      micRate = rate | 0;
+      micCh = channels | 0;
+      micFpp = framesPerPacket | 0;
+      if (micNode) {
+        try {
+          micNode.port.postMessage({
+            rate: micRate, outCh: micCh || 1, framesPerPacket: micFpp || 160,
+          });
+        } catch (_) {}
+      }
+      micLive = true;
+      document.getElementById('status').textContent = micArmed ?
+        'Connected · микрофон активен (' + micRate + ' Гц)' :
+        'Connected · сервер включил микрофон — нажмите кнопку «Микрофон»';
+      micUpdateBtn();
+    }
+
+    function rdpOnMicClose() {
+      micLive = false;
+      if (connected) document.getElementById('status').textContent = 'Connected';
+      micUpdateBtn();
+    }
+
+    // Диагностика: где остановился обмен с сервером (dvc → version →
+    // formats → open → data). Помогает понять, сервер не создал канал
+    // или сломался разбор PDU.
+    const MIC_STAGE_LABEL = {
+      'req-sent': 'запрос канала отправлен',
+      'dvccaps1': 'DVC v1',
+      'dvccaps2': 'DVC v2',
+      'dvccaps3': 'DVC v3',
+      'req-ok': 'запрос ушёл',
+      'req-fail': 'запрос НЕ ушёл (нет канала)',
+      'rdpdr-ann': 'rdpdr: announce отвечен',
+      'rdpdr-name': 'rdpdr: имя отправлено',
+      'rdpdr-caps': 'rdpdr: capabilities отвечены',
+      'rsp-ok': 'сервер подтвердил канал',
+      'rsp-fail': 'сервер ОТКЛОНИЛ канал',
+      dvc: 'канал создан',
+      version: 'версия',
+      formats: 'форматы',
+      open: 'сервер открыл',
+      formatchange: 'смена формата',
+      data: 'идёт звук',
+      worklet: 'браузер: захват через AudioWorklet (аудиопоток)',
+      noworklet: 'браузер: фолбэк ScriptProcessor (нет AudioWorklet)',
+      procfired: 'браузер: захват запущен',
+      pk: 'пик сигнала (0 = тишина)',
+      procblocked: 'браузер: захват запущен, но выключен кнопкой/каналом',
+      capture: 'браузер: первый чанк отправлен',
+      capmany: 'браузер: >100 чанков отправлено',
+      push: 'сервер: первый чанк ушёл',
+      pushmany: 'сервер: >100 чанков ушло'
+    };
+    // micLabel — человекочитаемое имя шага.
+    function micLabel(s) {
+      if (MIC_STAGE_LABEL[s]) return MIC_STAGE_LABEL[s];
+      if (s.indexOf('rdpdr') === 0) return 'rdpdr: ' + MIC_STAGE_LABEL[s];
+      if (s.indexOf('pdr') === 0) return 'rdpdr PDU 0x' + s.slice(3);
+      if (s.indexOf("reqname") === 0) return "запрос канала: " + s.slice(7);
+      if (s.indexOf("req") === 0) return "запрос канала #" + s.slice(3);
+      if (s.indexOf('fmt') === 0) return 'формат от сервера: ' + s.slice(3);
+      if (s.indexOf('fpp') === 0) return 'кадров в пакете (по OPEN): ' + s.slice(3);
+      if (s.indexOf('srv') === 0) return 'формат из OPEN (сервер): ' + s.slice(3);
+      if (s.indexOf('pk') === 0) return 'пик сигнала: ' + s.slice(2);
+      if (s.indexOf('rate') === 0) return 'скорость отправки: ' + s.slice(4) + ' кБ/с (факт/норма)';
+      if (s.indexOf('unk') === 0) return 'неизвестный ответ #' + s.slice(3);
+      return s;
+    }
+
+    // micRenderDebug — одна строка на шаг и на канал: длинную диагностику
+    // иначе невозможно выделить и скопировать (раньше была одна строка).
+    function micRenderDebug() {
+      const el = document.getElementById('micDebug');
+      if (!el) return;
+      if (!micApplyDiagVisibility()) return;
+      const seen = (el.dataset.seen || '').split(',').filter(Boolean);
+      const dvc = (el.dataset.dvc || '').split(',').filter(Boolean);
+      let out = 'mic-request: ' + (window.rdpMicRequested ? 'да (INFO_AUDIOCAPTURE)' : 'нет') +
+        '\nearly-flags: 0x' +
+        (((window.rdpExtraFlags || 0) >>> 0).toString(16).padStart(4, '0')) +
+        '\nmic:' + (seen.length ? '' : ' (шагов пока нет)');
+      for (let i = 0; i < seen.length; i++) out += '\n  ' + micLabel(seen[i]);
+      out += '\nканалы сервера (' + dvc.length + '):';
+      for (let i = 0; i < dvc.length; i++) out += '\n  ' + dvc[i];
+      el.textContent = out;
+    }
+
+    // micDiagOn — включена ли галочка «Диагностика» (по умолчанию выключена,
+    // состояние хранится в cookie rdp_micdiag). Пока выключена — диагностика
+    // не собирается и не показывается вообще.
+    function micDiagOn() {
+      const cb = document.getElementById('micDiag');
+      return !!(cb && cb.checked);
+    }
+
+    // micApplyDiagVisibility — показать/скрыть все элементы диагностики.
+    function micApplyDiagVisibility() {
+      const on = micDiagOn();
+      const el = document.getElementById('micDebug');
+      const toggleBtn = document.getElementById('micToggleBtn');
+      const copyBtn = document.getElementById('micCopyBtn');
+      if (!on) {
+        micDebugOpen = false;
+        if (el) el.style.display = 'none';
+        if (toggleBtn) toggleBtn.style.display = 'none';
+        if (copyBtn) copyBtn.style.display = 'none';
+        return false;
+      }
+      if (toggleBtn) toggleBtn.style.display = '';
+      if (copyBtn) copyBtn.style.display = '';
+      if (el) el.style.display = micDebugOpen ? '' : 'none';
+      micToggleLabel();
+      return true;
+    }
+
+    function micDiagChanged() {
+      saveCookies();
+      if (micApplyDiagVisibility()) micRenderDebug();
+    }
+
+    function micLastSuffix() {
+      const el = document.getElementById('micDebug');
+      const seen = ((el && el.dataset.seen) || '').split(',').filter(Boolean);
+      return seen.length ? ' (последнее: ' + micLabel(seen[seen.length - 1]) + ')' : '';
+    }
+
+    function micToggleLabel() {
+      const b = document.getElementById('micToggleBtn');
+      if (!b) return;
+      b.textContent = 'Диагностика микрофона ' + (micDebugOpen ? '▴' : '▾') + micLastSuffix();
+    }
+
+    function micToggleDebug() {
+      const el = document.getElementById('micDebug');
+      if (!el) return;
+      micDebugOpen = !micDebugOpen;
+      el.style.display = micDebugOpen ? '' : 'none';
+      micToggleLabel();
+    }
+
+    // micCopyDebug — копирует ПОЛНУЮ диагностику (не то, что видно на
+    // экране), поэтому работает независимо от прокрутки и размера окна.
+    function micCopyDebug() {
+      const el = document.getElementById('micDebug');
+      const btn = document.getElementById('micCopyBtn');
+      if (!el) return;
+      const seen = (el.dataset.seen || '').split(',').filter(Boolean);
+      const dvc = (el.dataset.dvc || '').split(',').filter(Boolean);
+      let out = 'mic:';
+      for (let i = 0; i < seen.length; i++) out += '\n  ' + micLabel(seen[i]);
+      out += '\nканалы сервера (' + dvc.length + '):';
+      for (let i = 0; i < dvc.length; i++) out += '\n  ' + dvc[i];
+
+      function feedback(ok) {
+        if (!btn) return;
+        btn.textContent = ok ? 'Скопировано' : 'Не удалось — выделите текст вручную';
+        setTimeout(function () { btn.textContent = 'Скопировать диагностику'; }, 2500);
+      }
+      function fallback() {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = out;
+          ta.style.position = 'fixed';
+          ta.style.top = '0';
+          ta.style.left = '0';
+          ta.style.width = '100%';
+          ta.style.height = '160px';
+          ta.style.zIndex = '9999';
+          ta.style.fontFamily = 'monospace';
+          ta.style.fontSize = '12px';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          ta.setSelectionRange(0, ta.value.length);
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          feedback(ok);
+        } catch (e) { feedback(false); }
+      }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(out).then(function () { feedback(true); },
+            function () { fallback(); });
+        } else {
+          fallback();
+        }
+      } catch (e) { fallback(); }
+    }
+
+    function rdpOnMicProgress(stage) {
+      if (!micDiagOn()) return;
+      const el = document.getElementById('micDebug');
+      if (!el) return;
+      const seen = (el.dataset.seen || '').split(',').filter(Boolean);
+      if (seen.indexOf(stage) === -1) seen.push(stage);
+      el.dataset.seen = seen.join(',');
+      micRenderDebug();
+    }
+
+    // Диагностика: какие DVC-каналы запрашивает сервер. Если
+    // AUDIO_INPUT тут нет — сервер вообще не инициирует аудиовход.
+    function rdpOnDvc(name) {
+      if (!micDiagOn()) return;
+      const el = document.getElementById('micDebug');
+      if (!el) return;
+      const list = (el.dataset.dvc || '').split(',').filter(Boolean);
+      if (list.indexOf(name) === -1) list.push(name);
+      el.dataset.dvc = list.join(',');
+      micRenderDebug();
+    }
+
+    let micProcCalls = 0;
+    let micChunks = 0;
+    let micPeak = 0;      // максимум |амплитуды| с момента включения
+    let micPeakStage = 0; // сколько раз уже показывали пик
+    function micProcess(ev) {
+      // Диагностика: обработчик вообще вызывается?
+      micProcCalls++;
+      if (micProcCalls === 1) rdpOnMicProgress('procfired');
+      if (!micArmed || !micLive || micRate <= 0 || micCh <= 0) {
+        if (micProcCalls === 1) rdpOnMicProgress('procblocked');
+        return;
+      }
+      try {
+        const inBuf = ev.inputBuffer;
+        const inRate = inBuf.sampleRate;
+        const inCh = inBuf.numberOfChannels;
+        const n = inBuf.length;
+        if (n <= 0 || inCh <= 0) return;
+        const outCh = micCh;
+        // Per-buffer linear resample (edge sample duplicated at the tail;
+        // a 1-sample joint is inaudible in voice, no cross-buffer state).
+        const ratio = inRate / micRate;
+        let frames = Math.ceil(n / ratio);
+        if (frames > 8192) frames = 8192;
+        const pcm = new Int16Array(frames * outCh);
+        for (let j = 0; j < frames; j++) {
+          const p = j * ratio;
+          let i0 = Math.floor(p);
+          if (i0 > n - 1) i0 = n - 1;
+          const i1 = (i0 + 1 > n - 1) ? n - 1 : i0 + 1;
+          const f = p - Math.floor(p);
+          for (let c = 0; c < outCh; c++) {
+            const srcCh = (c < inCh) ? c : 0;
+            const data = inBuf.getChannelData(srcCh);
+            let v = data[i0] + (data[i1] - data[i0]) * f;
+            if (v > 1) v = 1; else if (v < -1) v = -1;
+            const s16 = Math.round(v * 32767);
+            const a = s16 < 0 ? -s16 : s16;
+            if (a > micPeak) micPeak = a;
+            pcm[j * outCh + c] = s16;
+          }
+        }
+        if (typeof rdpMicPush === 'function') {
+          rdpMicPush(new Uint8Array(pcm.buffer, 0, frames * outCh * 2));
+          micChunks++;
+          if (micChunks === 1) rdpOnMicProgress('capture');
+          else if (micChunks === 100) rdpOnMicProgress('capmany');
+          // Пик сигнала: если он нулевой — захватывается тишина.
+          if (micChunks === 1 || micChunks - micPeakStage >= 100) {
+            micPeakStage = micChunks;
+            rdpOnMicProgress('pk' + micPeak);
+          }
+        }
+      } catch (_) { /* drop chunk on transient errors */ }
+    }
+
     // ── WebCodecs H.264 decoder ───────────────────────────────────────────────
     // h264Dec is created fresh on each RDP connection and torn down on
     // disconnect.  Frames are drawn directly onto rdpCanvas via drawImage().
     let h264Dec = null;
     let h264Timestamp = 0; // monotonically increasing μs counter
+    let h264Codec = null;  // actual codec string sent to VideoDecoder
+    let h264SeenKey = false; // have we fed the decoder a keyframe yet?
 
     // Pending frame position keyed by timestamp (μs).
     const h264FramePos = new Map();
+
+    // ── Frame counter / FPS display ───────────────────────────────────────────
+    let frameCount = 0;      // frames rendered since last update
+    let fpsTickTimer = null;
+
+    function rdpFrameTick() {
+      if (!connected) return;
+      frameCount++;
+    }
+
+    // Update the FPS readout every 500 ms while connected.
+    function fpsTicker() {
+      if (!connected) {
+        const st = document.getElementById("status");
+        if (st && st.textContent.indexOf("fps") !== -1) return; // leave terminal state
+        clearInterval(fpsTickTimer); fpsTickTimer = null; return;
+      }
+      const fps = Math.round(frameCount * (1000 / 500));
+      frameCount = 0;
+      const st = document.getElementById("status");
+      if (st) {
+        const base = h264Dec ? "Connected (WebCodecs H.264)" : "Connected";
+        st.textContent = base + " \u2014 " + fps + " fps";
+      }
+      const mf = document.getElementById("miniFps");
+      if (mf) mf.textContent = fps + " fps";
+    }
+
+    function fpsStop() {
+      if (fpsTickTimer) { clearInterval(fpsTickTimer); fpsTickTimer = null; }
+      frameCount = 0;
+      if (!document.getElementById("status")) return;
+      const st = document.getElementById("status");
+      if (st && st.textContent.indexOf("fps") !== -1) {
+        st.textContent = h264Dec ? "Connected (WebCodecs H.264)" : "Connected";
+      }
+      const mf = document.getElementById("miniFps");
+      if (mf) mf.textContent = "";
+    }
+
+    // ── Ping / задержка до RDP-хоста ────────────────────────────────────────
+    // Прокси (grdp-proxy) отдаёт TCP RTT до target на /ping?target=host:port.
+    // Опрашиваем каждые 2 с, пока подключено, и показываем в островке.
+    let pingTimer = null;
+    let lastPingMs = -1;
+
+    // Версия клиента для антикэш-параметра в пинге страницы.
+    const CLIENT_VERSION = 70;
+
+    function pingPage() {
+      // Пинг от клиента до страницы RDP (браузер → роутер/панель).
+      // Замеряем RTT простым GET к самому клиенту с таймингом.
+      if (!connected) return;
+      const t0 = performance.now();
+      fetch("/rdp/?v=" + CLIENT_VERSION + "&_=" + Date.now(), { cache: "no-store", mode: "same-origin" })
+        .then(function(r) {
+          if (!r.ok) throw new Error("http " + r.status);
+          const ms = Math.round(performance.now() - t0);
+          const el = document.getElementById("miniPagePing");
+          if (el) el.textContent = "панель: " + ms + " мс";
+        })
+        .catch(function() {
+          const el = document.getElementById("miniPagePing");
+          if (el) el.textContent = "";
+        });
+    }
+
+    function pingOnce() {
+      if (!connected) return;
+      const hostEl = document.getElementById("host");
+      const portEl = document.getElementById("port");
+      if (!hostEl || !hostEl.value.trim()) { return; }
+      const target = hostEl.value.trim() + ":" + ((portEl && portEl.value.trim()) || "3389");
+      fetch("/rdp/ping?target=" + encodeURIComponent(target), { cache: "no-store" })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!connected) return;
+          const ms = (typeof d.ms === "number") ? d.ms : -1;
+          lastPingMs = ms;
+          const el = document.getElementById("miniPing");
+          if (el) el.textContent = (ms >= 0) ? ("RDP: " + ms + " мс") : "";
+        })
+        .catch(function() {});
+    }
+
+    function pingStart() {
+      pingStop();
+      pingOnce();
+      pingPage();
+      pingTimer = setInterval(function() { pingOnce(); pingPage(); }, 2000);
+    }
+
+    function pingStop() {
+      if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+      const el = document.getElementById("miniPing");
+      if (el) el.textContent = "";
+      const pel = document.getElementById("miniPagePing");
+      if (pel) pel.textContent = "";
+    }
 
     function h264Supported() {
       return (typeof VideoDecoder !== 'undefined') &&
              (typeof EncodedVideoChunk !== 'undefined');
     }
 
-    function createH264Decoder(width, height) {
+    // Extract the (first) SPS NAL from an Annex-B stream and build the
+    // matching avc1 codec string. Returns null if no SPS is present.
+    // Format: avc1.<profile_idc><constraint><level>, two hex digits each,
+    // per RFC 6381 (constraint_flags derived from constraint_set0..2).
+    function h264CodecFromSps(uint8Data) {
+      const arr = (uint8Data instanceof Uint8Array) ? uint8Data : new Uint8Array(uint8Data);
+      for (let i = 0; i + 4 < arr.length; i++) {
+        if (arr[i] === 0 && arr[i + 1] === 0 && arr[i + 2] === 1) {
+          const nalType = arr[i + 3] & 0x1f;
+          if (nalType === 7 && i + 8 < arr.length) { // SPS
+            const profile = arr[i + 4];
+            const constraint = arr[i + 5];
+            const level = arr[i + 6];
+            const cc = ((constraint >> 5) & 0x07) << 3;
+            const hex = (v) => ('0' + v.toString(16)).slice(-2);
+            return 'avc1.' + hex(profile) + hex(cc) + hex(level);
+          }
+        }
+      }
+      return null;
+    }
+
+    function createH264Decoder(width, height, codec) {
       if (!h264Supported()) return null;
       const decoder = new VideoDecoder({
         output(frame) {
+          if (!connected) { frame.close(); return; }
           const pos = h264FramePos.get(frame.timestamp);
           h264FramePos.delete(frame.timestamp);
           const x = pos ? pos.x : 0;
           const y = pos ? pos.y : 0;
           ctx2d.drawImage(frame, x, y);
           frame.close();
+          rdpFrameTick();
         },
         error(e) {
           console.warn('WebCodecs H.264 decoder error:', e);
+          // Reset decoder; drop pending frames so a fresh IDR is requested.
+          h264SeenKey = false;
+          h264FramePos.clear();
         }
       });
-      decoder.configure({
-        codec: 'avc1.42E01E',   // H.264 Baseline (covers AVC420/444 from RDP)
-        codedWidth: width,
-        codedHeight: height,
-        optimizeForLatency: true,
-      });
+      try {
+        decoder.configure({
+          codec: codec || 'avc1.42E01F', // Baseline level 3.1 fallback
+          codedWidth: width,
+          codedHeight: height,
+          optimizeForLatency: true,
+        });
+      } catch (e) {
+        console.warn('configure() failed:', e);
+        h264SeenKey = false;
+        return null;
+      }
+      h264Codec = codec || 'avc1.42E01F';
+      h264SeenKey = false;
       return decoder;
     }
 
-    // Called from Go/WASM with raw H.264 NAL unit data.
+    // Called from Go/WASM with raw H.264 NAL unit data (AVC420 only).
     function rdpOnH264(destX, destY, w, h, isKey, uint8Data) {
       if (!h264Dec || h264Dec.state === 'closed') return;
-      h264Timestamp += 1000; // 1 ms apart (decoder uses μs)
+      // Determine/re-evaluate codec from SPS. The first keyframe of each
+      // stream carries SPS/PPS; use its profile/level, not a hardcoded one.
+      const sps = h264CodecFromSps(uint8Data);
+      if (sps && sps !== h264Codec) {
+        try {
+          h264Dec.configure({
+            codec: sps, codedWidth: w, codedHeight: h, optimizeForLatency: true
+          });
+        } catch (e) {
+          console.warn('reconfigure ' + sps + ' failed:', e);
+        }
+        h264Codec = sps;
+      }
+      // WebCodecs cannot decode a delta frame before a keyframe. Drop
+      // everything until the first IDR of the current stream.
+      if (!h264SeenKey && !isKey) return;
+      if (isKey) h264SeenKey = true;
+
+      // One complete coded frame in a single chunk (grdp hands us whole
+      // AVC420 pictures). Timestamps go up by 1ms per frame.
+      h264Timestamp += 1000;
       h264FramePos.set(h264Timestamp, { x: destX, y: destY });
       try {
         h264Dec.decode(new EncodedVideoChunk({
@@ -241,19 +1865,52 @@
     const pointerCache = new Map(); // idx → CSS cursor value
 
     function rdpOnPointerHide() {
-      canvas.style.cursor = 'none';
+      // «Всегда показывать локальный курсор» (cookie rdp_always_cursor /
+      // query-параметр alwaysCursor): полностью игнорируем серверные формы
+      // и всегда показываем локальную стрелку. Серверный курсор в RDP часто
+      // белый без чёрной обводки — на светлом фоне он невидим.
+      canvas.style.cursor = alwaysCursorOn() ? 'default' : 'none';
     }
 
     function rdpOnPointerCached(idx) {
+      if (alwaysCursorOn()) {
+        canvas.style.cursor = 'default';
+        return;
+      }
       const css = pointerCache.get(idx);
       if (css) canvas.style.cursor = css;
     }
 
     function rdpOnPointerUpdate(idx, xorBpp, hotX, hotY, w, h, andMask, xorData) {
+      if (alwaysCursorOn()) {
+        canvas.style.cursor = 'default';
+        return;
+      }
       const css = buildCursorCss(xorBpp, hotX, hotY, w, h, andMask, xorData);
       if (!css) return;
       pointerCache.set(idx, css);
       canvas.style.cursor = css;
+    }
+
+    // alwaysCursorOn — включена ли опция «всегда показывать локальный курсор».
+    // Источники по приоритету: чекбокс #alwaysCursor в панели клиента →
+    // query-параметр alwaysCursor=1 (старые URL) → cookie rdp_always_cursor.
+    function alwaysCursorOn() {
+      const cb = document.getElementById('alwaysCursor');
+      if (cb) return cb.checked;
+      if (getQueryParam('alwaysCursor') === '1') return true;
+      return getCookie('rdp_always_cursor') === '1';
+    }
+
+    function getQueryParam(key) {
+      var q = window.location.search;
+      if (!q) return '';
+      var params = q.slice(1).split('&');
+      for (var i = 0; i < params.length; i++) {
+        var kv = params[i].split('=');
+        if (kv[0] === key) return decodeURIComponent((kv[1] || '').replace(/\+/g, ' '));
+      }
+      return '';
     }
 
     // buildCursorCss rasterises an MS-RDPBCGR pointer (§2.2.9.1.1.4.4) into a
@@ -337,9 +1994,11 @@
           }
         }
       } else {
-        // Unsupported depth (15/16bpp etc.): leave canvas transparent so the
-        // cursor hides rather than rendering garbage.
+        // Unsupported depth (15/16bpp etc.): don't apply a transparent cursor
+        // (invisible). Return null so the caller keeps/falls back to a visible
+        // cursor instead of hiding the pointer entirely.
         console.warn('Unsupported cursor xorBpp:', xorBpp);
+        return null;
       }
 
       octx.putImageData(img, 0, 0);
@@ -360,9 +2019,14 @@
     }
 
     // ── WASM bootstrap ────────────────────────────────────────────────────────
-    WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then(result => {
+    // main.wasm кешируется агрессивно: версия в query обязательна,
+    // иначе браузер молча крутит старый билд без нового API (как было с микрофоном).
+    WebAssembly.instantiateStreaming(fetch("main.wasm?v=" + CLIENT_VERSION), go.importObject).then(result => {
       go.run(result.instance);
       document.getElementById("status").textContent = "Ready";
+      micUpdateBtn();
+      micApplyDiagVisibility();
+      micRefreshDevices();
     }).catch(e => {
       document.getElementById("status").textContent = "WASM load failed: " + e;
     });
@@ -380,7 +2044,7 @@
       }
     }
 
-    function doConnect() {
+    async function doConnect() {
       const host     = document.getElementById("host").value.trim();
       const port     = document.getElementById("port").value.trim();
       const domain   = document.getElementById("domain").value.trim();
@@ -390,12 +2054,30 @@
       const height   = parseInt(document.getElementById("height").value) || 800;
 
       saveCookies();
+      rememberHost(host);
 
       // (Re)create the H.264 decoder sized for this session.
       if (h264Dec) { try { h264Dec.close(); } catch (_) {} }
-      h264Dec = createH264Decoder(width, height);
+      // VideoDecoder may exist but lack H.264 (e.g. Android HW). Probe the
+      // actual codec support and only then decide whether to advertise AVC.
+      let webCodecsOk = h264Supported();
+      if (webCodecsOk && typeof VideoDecoder.isConfigSupported === 'function') {
+        try {
+          const probe = await VideoDecoder.isConfigSupported(
+            { codec: 'avc1.42001F', codedWidth: width, codedHeight: height });
+          webCodecsOk = probe && probe.supported === true;
+        } catch (_) { webCodecsOk = false; }
+      }
+      // Ручное отключение H.264 (чекбокс «Битмапы»): сервер шлёт RemoteFX/NSCodec.
+      // Кадры самодостаточны — стабильнее через медленные/буферизующие каналы.
+      if (document.getElementById('noH264').checked) webCodecsOk = false;
+      // Tell the Go side up-front: without WebCodecs we must NOT advertise
+      // AVC/H.264, otherwise the server sends H.264 frames nobody decodes.
+      window.noWebCodecs = !webCodecsOk;
+      h264Dec = webCodecsOk ? createH264Decoder(width, height) : null;
       h264Timestamp = 0;
       h264FramePos.clear();
+      h264SeenKey = false;
 
       // Reset cursor state for the new session.
       pointerCache.clear();
@@ -411,8 +2093,13 @@
       } else {
         document.getElementById("status").textContent = "Connecting… (WebCodecs unavailable)";
       }
+      const qdEl = document.getElementById("queueDepth");
+      const queueDepth = qdEl ? (parseInt(qdEl.value, 10) || 0) : 0;
+      // Запрос микрофона у сервера (INFO_AUDIOCAPTURE) — только при подключении.
+      const micReqEl = document.getElementById("micRequest");
+      window.rdpMicRequested = !!(micReqEl && micReqEl.checked);
       rdpConnect(proxyURL(), host, port, domain, user, password, width, height,
-        document.getElementById("swapAltMeta").checked);
+        document.getElementById("swapAltMeta").checked, queueDepth);
     }
 
     // Callbacks from WASM
@@ -423,28 +2110,79 @@
       btn.classList.add("connected");
       document.getElementById("status").textContent =
         h264Dec ? "Connected (WebCodecs H.264)" : "Connected";
-      document.getElementById("rdpCanvas").focus();
+      const pb = document.getElementById("rdpPasteBridge");
+      if (pb) pb.focus();
+      if (fpsTickTimer) clearInterval(fpsTickTimer);
+      frameCount = 0;
+      fpsTickTimer = setInterval(fpsTicker, 500);
+      pingStart();
+      // Если микрофон включили до подключения, клиент тогда ещё не
+      // существовал (вызов был no-op) — повторяем арм на новой сессии.
+      if (micArmed && typeof rdpMicSetEnabled === 'function') {
+        try { rdpMicSetEnabled(true); } catch (_) {}
+      }
+      micUpdateBtn();
+      everConnected = true;
+      updateMiniConn();
     }
 
     function rdpOnError(msg) {
-      setDisconnected("Error: " + msg);
+      setDisconnected("Ошибка: " + humanizeRdpError(msg));
+      const st = document.getElementById("status");
+      if (st) st.title = String(msg || '');   // исходный текст — в подсказке
     }
 
     function rdpOnClose() {
-      setDisconnected("Closed");
+      setDisconnected("Сессия закрыта");
     }
 
     // Server → client: write text to browser clipboard (text only).
-    function rdpOnClipboard(text) {
+    // Clipboard API работает только в secure context (HTTPS/localhost).
+    // По HTTP по LAN navigator.clipboard undefined — используем fallback
+    // через document.execCommand('copy') с hidden textarea.
+    function clipboardWrite(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).catch(err => {
-          console.warn("clipboard write failed:", err);
+        return navigator.clipboard.writeText(text).catch(err => {
+          console.warn("clipboard.writeText failed, fallback:", err);
+          legacyClipboardWrite(text);
         });
       }
+      legacyClipboardWrite(text);
+    }
+
+    function legacyClipboardWrite(text) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) console.warn("legacy clipboard copy failed");
+      } catch (e) {
+        console.warn("legacy clipboard copy error:", e);
+      }
+    }
+
+    function rdpOnClipboard(text) {
+      clipboardWrite(text);
     }
 
     function setDisconnected(msg) {
       connected = false;
+      fpsStop();
+      pingStop();
+      // Сессии больше нет — потребитель захвата пропал: гасим микрофон
+      // полностью (индикатор ОС гаснет). Для новой сессии — один клик
+      // по кнопке (разрешение origin уже выдано, повторного запроса не будет).
+      micStop();
+      micLive = false;   // серверный канал умер вместе с сессией
+      micRate = 0;
+      micCh = 0;
+      micFpp = 0;
       if (audioCtx) { try { audioCtx.close(); } catch (_) {} audioCtx = null; audioNextAt = 0; }
       if (h264Dec) { try { h264Dec.close(); } catch (_) {} h264Dec = null; }
       h264FramePos.clear();
@@ -452,29 +2190,75 @@
       btn.textContent = "Connect";
       btn.classList.remove("connected");
       document.getElementById("status").textContent = msg;
+      updateMiniConn();
+    }
+
+    // ── Вписать в окно / полный экран ────────────────────────────────────────
+    // В режиме «Вписать» canvas масштабируется CSS-ом, поэтому координаты
+    // мыши пересчитываются из CSS-размера в пиксели буфера (canvasXY).
+    function fitOn() {
+      const w = document.getElementById('canvasWrapper');
+      return !!(w && w.classList.contains('fit'));
+    }
+
+    function applyFit(on) {
+      const w = document.getElementById('canvasWrapper');
+      const b = document.getElementById('fitBtn');
+      if (w) w.classList.toggle('fit', on);
+      if (b) b.classList.toggle('on', on);
+      setCookie('rdp_fit', on ? '1' : '0');
+    }
+
+    function toggleFit() { applyFit(!fitOn()); }
+
+    function canvasXY(e) {
+      const r = canvas.getBoundingClientRect();
+      const sx = r.width ? canvas.width / r.width : 1;
+      const sy = r.height ? canvas.height / r.height : 1;
+      return {
+        x: Math.floor((e.clientX - r.left) * sx),
+        y: Math.floor((e.clientY - r.top) * sy)
+      };
+    }
+
+    function toggleFullscreen() {
+      try {
+        const el = document.documentElement;
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl) {
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          return;
+        }
+        if (el.requestFullscreen) {
+          const p = el.requestFullscreen();
+          if (p && p.catch) p.catch(function () {});
+        } else if (el.webkitRequestFullscreen) {
+          el.webkitRequestFullscreen();
+        }
+      } catch (_) {}
     }
 
     // Mouse / keyboard events
     canvas.addEventListener("mousemove", e => {
       if (!connected) return;
-      const r = canvas.getBoundingClientRect();
-      rdpMouseMove(Math.floor(e.clientX - r.left), Math.floor(e.clientY - r.top));
+      const p = canvasXY(e);
+      rdpMouseMove(p.x, p.y);
     });
 
     canvas.addEventListener("mousedown", e => {
       if (!connected) return;
       e.preventDefault();
-      canvas.focus();
-      const r = canvas.getBoundingClientRect();
+      const p = canvasXY(e);
       // grdp button: 0=left, 1=middle, 2=right  (JS: 0=left, 1=middle, 2=right)
-      rdpMouseDown(e.button, Math.floor(e.clientX - r.left), Math.floor(e.clientY - r.top));
+      rdpMouseDown(e.button, p.x, p.y);
     });
 
     canvas.addEventListener("mouseup", e => {
       if (!connected) return;
       e.preventDefault();
-      const r = canvas.getBoundingClientRect();
-      rdpMouseUp(e.button, Math.floor(e.clientX - r.left), Math.floor(e.clientY - r.top));
+      const p = canvasXY(e);
+      rdpMouseUp(e.button, p.x, p.y);
     });
 
     canvas.addEventListener("wheel", e => {
@@ -499,40 +2283,88 @@
     // Track the in-flight clipboard read so keydown can wait for it to finish.
     let clipboardSyncPromise = Promise.resolve();
 
+    // Чтение локального клипборда. Clipboard API (readText) требует secure
+    // context — по HTTP по LAN недоступен, поэтому основной путь — событие
+    // paste (e.clipboardData работает по HTTP) на скрытой textarea.
+    // readText пробуем как bonus (HTTPS).
     function syncClipboard() {
-      if (!connected || !navigator.clipboard || !navigator.clipboard.readText) return;
-      // pointerdown is a user gesture; Chrome will prompt for clipboard-read
-      // permission on first use and read silently thereafter.
-      clipboardSyncPromise = navigator.clipboard.readText()
-        .then(text => { if (text) rdpClipboardChanged(text); })
-        .catch(() => {});
+      if (!connected) return;
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const readPromise = navigator.clipboard.readText()
+          .then(text => { if (text) rdpClipboardChanged(text); })
+          .catch(err => {
+            if (err && err.name === "NotAllowedError") {
+              console.warn("clipboard-read denied (iframe allow=?", err.message);
+            } else {
+              console.warn("clipboard read failed:", err);
+            }
+          });
+        clipboardSyncPromise = Promise.race([
+          readPromise,
+          new Promise(res => setTimeout(res, 1500))
+        ]);
+      }
+    }
+
+    // Скрытая textarea — постоянная точка фокуса (как helper-textarea xterm.js):
+    // на ней ловим нативный paste (работает по HTTP, e.clipboardData не требует
+    // secure context) и клавиши, которые перенаправляем в RDP.
+    const pasteBridge = document.getElementById("rdpPasteBridge");
+    if (pasteBridge) {
+      pasteBridge.addEventListener("paste", e => {
+        if (!connected) return;
+        e.preventDefault();
+        const text = e.clipboardData ? e.clipboardData.getData("text/plain") : "";
+        pasteBridge.value = "";
+        if (text) {
+          rdpClipboardChanged(text);
+          // Ctrl физически ещё нажат — шлём V, чтобы Windows вставила.
+          rdpKeyDown("KeyV");
+          setTimeout(() => { if (connected) rdpKeyUp("KeyV"); }, 50);
+        }
+      });
+
+      pasteBridge.addEventListener("keydown", async e => {
+        if (!connected) return;
+        if ((e.ctrlKey || e.metaKey) && (e.code === "KeyV")) {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            e.preventDefault();
+            syncClipboard();
+            await clipboardSyncPromise;
+            rdpKeyDown("KeyV");
+            setTimeout(() => { if (connected) rdpKeyUp("KeyV"); }, 50);
+          }
+          // HTTP: НЕ preventDefault — браузер сгенерирует нативный paste на textarea.
+          return;
+        }
+        e.preventDefault();
+        rdpKeyDown(e.code);
+      });
+
+      pasteBridge.addEventListener("keyup", e => {
+        if (!connected) return;
+        if ((e.ctrlKey || e.metaKey) && (e.code === "KeyV")) return;
+        e.preventDefault();
+        rdpKeyUp(e.code);
+      });
     }
 
     // Sync on click: covers the common case of copying in another app then
     // clicking back into the canvas before pressing the paste key.
-    canvas.addEventListener("pointerdown", syncClipboard);
+    // Возвращаем фокус на скрытую textarea, чтобы следующее Ctrl+V пришло на неё.
+    canvas.addEventListener("pointerdown", () => {
+      syncClipboard();
+      if (pasteBridge) pasteBridge.focus();
+    });
 
-    // Sync via paste event (Cmd+V on macOS, right-click paste, etc.)
-    document.addEventListener("paste", e => {
+    // Sync via paste event (Cmd+V on macOS, right-click paste, etc.).
+    // e.clipboardData работает и по HTTP (не требует secure context).
+    function handlePaste(e) {
       if (!connected) return;
       const text = e.clipboardData ? e.clipboardData.getData("text/plain") : "";
       if (text) rdpClipboardChanged(text);
-    });
-
-    // Await any pending clipboard sync before forwarding each key, so that a
-    // pointerdown-triggered readText() always completes before reaching the server.
-    canvas.addEventListener("keydown", async e => {
-      if (!connected) return;
-      e.preventDefault();
-      await clipboardSyncPromise;
-      rdpKeyDown(e.code);
-    });
-
-    canvas.addEventListener("keyup", e => {
-      if (!connected) return;
-      e.preventDefault();
-      rdpKeyUp(e.code);
-    });
+    }
+    document.addEventListener("paste", handlePaste);
   </script>
 </body>
 </html>

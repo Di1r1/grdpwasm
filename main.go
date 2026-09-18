@@ -33,12 +33,14 @@ func main() {
 	js.Global().Set("rdpKeyDown", js.FuncOf(jsKeyDown))
 	js.Global().Set("rdpKeyUp", js.FuncOf(jsKeyUp))
 	js.Global().Set("rdpClipboardChanged", js.FuncOf(jsClipboardChanged))
+	js.Global().Set("rdpMicPush", js.FuncOf(jsMicPush))
+	js.Global().Set("rdpMicSetEnabled", js.FuncOf(jsMicSetEnabled))
 
 	// Block forever — JS callbacks keep things alive.
 	select {}
 }
 
-// jsConnect is called from JS: rdpConnect(proxyWsURL, host, port, domain, user, password, width, height, swapAltMeta)
+// jsConnect is called from JS: rdpConnect(proxyWsURL, host, port, domain, user, password, width, height, swapAltMeta[, queueDepth])
 func jsConnect(_ js.Value, args []js.Value) any {
 	if len(args) < 8 {
 		return fmt.Sprintf("usage: rdpConnect(proxyWsURL, host, port, domain, user, password, width, height[, swapAltMeta])")
@@ -56,9 +58,16 @@ func jsConnect(_ js.Value, args []js.Value) any {
 	} else {
 		swapAltMeta = false
 	}
+	queueDepth := uint32(0)
+	if len(args) >= 10 && args[9].Type() == js.TypeNumber {
+		d := args[9].Int()
+		if d >= 0 {
+			queueDepth = uint32(d)
+		}
+	}
 
 	go func() {
-		if err := connect(proxyWsURL, host, port, domain, user, password, width, height); err != nil {
+		if err := connect(proxyWsURL, host, port, domain, user, password, width, height, queueDepth); err != nil {
 			slog.Error("connect", "err", err)
 			js.Global().Call("rdpOnError", err.Error())
 		}
@@ -66,7 +75,7 @@ func jsConnect(_ js.Value, args []js.Value) any {
 	return nil
 }
 
-func connect(proxyWsURL, host, port, domain, user, password string, width, height int) error {
+func connect(proxyWsURL, host, port, domain, user, password string, width, height int, queueDepth uint32) error {
 	clientMu.Lock()
 	if rdpClient != nil {
 		rdpClient.Close()
@@ -83,6 +92,21 @@ func connect(proxyWsURL, host, port, domain, user, password string, width, heigh
 		return dialWebSocket(wsURL)
 	})
 
+	// WASM-клиент не имеет встроенного программного декодера H.264.
+	// Строго рекламируем только AVC420 (без AVC444/LC2 chroma-upgrade) —
+	// иначе сервер пришлёт кадры LC=2, которые здесь нечем обработать.
+	g.DisableAVC444()
+
+	// Диагностика: дополнительные флаги early capabilities из адреса
+	// (?flags=0x0040) — проверяем, какие из них влияют на сервер.
+	if v := js.Global().Get("rdpExtraFlags"); v.Type() == js.TypeNumber {
+		g.SetExtraEarlyCapabilityFlags(uint16(v.Int()))
+	}
+
+	// Запрос перенаправления микрофона (INFO_AUDIOCAPTURE в Client Info PDU).
+	// Без него Windows не открывает канал AUDIO_INPUT.
+	g.SetMicRequested(js.Global().Get("rdpMicRequested").Truthy())
+
 	// Get canvas from DOM
 	canvas = js.Global().Get("document").Call("getElementById", "rdpCanvas")
 	ctx2d = canvas.Call("getContext", "2d")
@@ -95,11 +119,34 @@ func connect(proxyWsURL, host, port, domain, user, password string, width, heigh
 		playAudio(int(af.SamplesPerSec), int(af.Channels), int(af.BitsPerSample), cp)
 	})
 
-	g.OnH264Raw(func(destX, destY, w, h int, isKey bool, data []byte) {
-		jsArr := js.Global().Get("Uint8Array").New(len(data))
-		js.CopyBytesToJS(jsArr, data)
-		js.Global().Call("rdpOnH264", destX, destY, w, h, isKey, jsArr)
+	// Микрофон (MS-RDPEAI): сервер открывает захват — сообщаем JS целевой
+	// формат; JS шлёт PCM16 через rdpMicPush.
+	g.OnMicOpen(func(f grdp.MicFormat) {
+		js.Global().Call("rdpOnMicOpen", int(f.SamplesPerSec), int(f.Channels), int(f.FramesPerPacket))
+		js.Global().Call("rdpOnMicProgress",
+			fmt.Sprintf("fmt%dx%d", f.SamplesPerSec, f.Channels))
+		if f.FramesPerPacket > 0 {
+			js.Global().Call("rdpOnMicProgress",
+				fmt.Sprintf("fpp%d", f.FramesPerPacket))
+		}
+	}).OnMicClose(func() {
+		js.Global().Call("rdpOnMicClose")
+	}).OnMicProgress(func(stage string) {
+		js.Global().Call("rdpOnMicProgress", stage)
+	}).OnDvcRequest(func(name string) {
+		js.Global().Call("rdpOnDvc", name)
 	})
+
+	// Когда WebCodecs недоступен, не регистрируем onH264Raw: grdp в этом
+	// случае отправит CAPS_ADVERTISE v8.0 + AVCDisabled, сервер переключится
+	// на RemoteFX/NSCodec, и картинка идёт через OnBitmap.
+	if !js.Global().Get("noWebCodecs").Truthy() {
+		g.OnH264Raw(func(destX, destY, w, h int, isKey bool, data []byte) {
+			jsArr := js.Global().Get("Uint8Array").New(len(data))
+			js.CopyBytesToJS(jsArr, data)
+			js.Global().Call("rdpOnH264", destX, destY, w, h, isKey, jsArr)
+		})
+	}
 
 	uint8Ctor := js.Global().Get("Uint8Array")
 	g.OnPointerHide(func() {
@@ -157,6 +204,12 @@ func connect(proxyWsURL, host, port, domain, user, password string, width, heigh
 		return err
 	}
 
+	// Apply the stream preset's queueDepth hint once the session is up:
+	// tune-rate/quality throttle reported to the server. 0 = no throttle.
+	if queueDepth > 0 {
+		g.SetQueueDepthHint(queueDepth)
+	}
+
 	clientMu.Lock()
 	rdpClient = g
 	clientMu.Unlock()
@@ -211,6 +264,10 @@ func renderBitmaps(bs []grdp.Bitmap) {
 		imageData := imageDataCtor.New(jsArr, w, h)
 		ctx2d.Call("putImageData", imageData, bm.DestLeft, bm.DestTop)
 	}
+
+	// Feed the JS frame counter (bitmap/RemoteFX path renders). Animation and
+	// partial updates both count as one refresh per call.
+	js.Global().Call("rdpFrameTick")
 }
 
 func jsDisconnect(_ js.Value, _ []js.Value) any {
@@ -323,6 +380,41 @@ func jsClipboardChanged(_ js.Value, args []js.Value) any {
 	clientMu.Unlock()
 	if c != nil {
 		c.NotifyClipboardChanged()
+	}
+	return nil
+}
+
+// jsMicPush is called from JS with one Uint8Array PCM16 chunk captured
+// from the microphone. Routed to the audin handler (dropped unless the
+// server holds capture open and the mic toggle is armed).
+func jsMicPush(_ js.Value, args []js.Value) any {
+	if len(args) < 1 {
+		return nil
+	}
+	arr := js.Global().Get("Uint8Array").New(args[0])
+	buf := make([]byte, arr.Length())
+	js.CopyBytesToGo(buf, arr)
+
+	clientMu.Lock()
+	c := rdpClient
+	clientMu.Unlock()
+	if c != nil {
+		c.MicPush(buf)
+	}
+	return nil
+}
+
+// jsMicSetEnabled arms (true) or disarms (false) microphone capture.
+func jsMicSetEnabled(_ js.Value, args []js.Value) any {
+	enabled := false
+	if len(args) >= 1 {
+		enabled = args[0].Truthy()
+	}
+	clientMu.Lock()
+	c := rdpClient
+	clientMu.Unlock()
+	if c != nil {
+		c.SetMicEnabled(enabled)
 	}
 	return nil
 }

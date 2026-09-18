@@ -16,11 +16,12 @@ type wsConn struct {
 	readBuf chan []byte
 	pending []byte
 	closed  bool
+	dropped int
 }
 
 func dialWebSocket(proxyURL string) (net.Conn, error) {
 	c := &wsConn{
-		readBuf: make(chan []byte, 256),
+		readBuf: make(chan []byte, 2048),
 	}
 
 	ws := js.Global().Get("WebSocket").New(proxyURL)
@@ -52,6 +53,10 @@ func dialWebSocket(proxyURL string) (net.Conn, error) {
 			case c.readBuf <- buf:
 			default:
 				// drop if buffer full
+				c.dropped++
+				if c.dropped%100 == 1 {
+					fmt.Println("WASM drop:", c.dropped, "bytes:", len(buf))
+				}
 			}
 		}
 		return nil
